@@ -17,9 +17,11 @@
 #include "guilib/GUIWindowManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
+#include "video/VideoFileItemClassify.h"
 
 #include <mutex>
 
+using namespace KODI;
 using namespace std::chrono_literals;
 
 std::shared_ptr<const IPlayer> CApplicationPlayer::GetInternal() const
@@ -99,7 +101,7 @@ bool CApplicationPlayer::OpenFile(const CFileItem& item, const CPlayerOptions& o
   {
     bool needToClose = false;
 
-    if (item.IsDiscImage() || item.IsDVDFile())
+    if (item.IsDiscImage() || VIDEO::IsDVDFile(item))
       needToClose = true;
 
     if (player->m_name != newPlayer)
@@ -226,12 +228,12 @@ bool CApplicationPlayer::HasGame() const
 PLAYLIST::Id CApplicationPlayer::GetPreferredPlaylist() const
 {
   if (IsPlayingVideo())
-    return PLAYLIST::TYPE_VIDEO;
+    return PLAYLIST::Id::TYPE_VIDEO;
 
   if (IsPlayingAudio())
-    return PLAYLIST::TYPE_MUSIC;
+    return PLAYLIST::Id::TYPE_MUSIC;
 
-  return PLAYLIST::TYPE_NONE;
+  return PLAYLIST::Id::TYPE_NONE;
 }
 
 bool CApplicationPlayer::HasRDS() const
@@ -325,10 +327,10 @@ bool CApplicationPlayer::CanSeek() const
   return (player && player->CanSeek());
 }
 
-bool CApplicationPlayer::SeekScene(bool bPlus)
+bool CApplicationPlayer::SeekScene(Direction seekDirection)
 {
   std::shared_ptr<IPlayer> player = GetInternal();
-  return (player && player->SeekScene(bPlus));
+  return (player && player->SeekScene(seekDirection));
 }
 
 void CApplicationPlayer::SeekTime(int64_t iTime)

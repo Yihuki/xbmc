@@ -12,6 +12,7 @@
 #include "DirectoryFactory.h"
 #include "FileDirectoryFactory.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "PasswordManager.h"
 #include "ServiceBroker.h"
 #include "URL.h"
@@ -19,13 +20,17 @@
 #include "dialogs/GUIDialogBusy.h"
 #include "guilib/GUIWindowManager.h"
 #include "messaging/ApplicationMessenger.h"
+#include "music/MusicFileItemClassify.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/Job.h"
 #include "utils/JobManager.h"
 #include "utils/URIUtils.h"
 #include "utils/log.h"
+#include "video/VideoFileItemClassify.h"
 
+using namespace KODI;
 using namespace XFILE;
 using namespace std::chrono_literals;
 
@@ -282,7 +287,8 @@ bool CDirectory::GetDirectory(const CURL& url,
 
     //  Should any of the files we read be treated as a directory?
     //  Disable for database folders, as they already contain the extracted items
-    if (!(hints.flags & DIR_FLAG_NO_FILE_DIRS) && !items.IsMusicDb() && !items.IsVideoDb() && !items.IsSmartPlayList())
+    if (!(hints.flags & DIR_FLAG_NO_FILE_DIRS) && !MUSIC::IsMusicDb(items) &&
+        !VIDEO::IsVideoDb(items) && !PLAYLIST::IsSmartPlayList(items))
       FilterFileDirectories(items, hints.mask);
 
     // Correct items for path substitution

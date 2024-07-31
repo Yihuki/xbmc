@@ -9,8 +9,10 @@
 #include "PVRThumbLoader.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "TextureCache.h"
+#include "imagefiles/ImageFileURL.h"
 #include "pvr/PVRManager.h"
 #include "pvr/filesystem/PVRGUIDirectory.h"
 #include "settings/AdvancedSettings.h"
@@ -100,6 +102,6 @@ bool CPVRThumbLoader::FillThumb(CFileItem& item)
 std::string CPVRThumbLoader::CreateChannelGroupThumb(const CFileItem& channelGroupItem)
 {
   return StringUtils::Format("{}?ts={}", // append timestamp to Thumb URL to enforce texture refresh
-                             CTextureUtils::GetWrappedImageURL(channelGroupItem.GetPath(), "pvr"),
+                             IMAGE_FILES::URLFromFile(channelGroupItem.GetPath(), "pvr"),
                              std::time(nullptr));
 }

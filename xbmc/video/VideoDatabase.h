@@ -25,6 +25,7 @@ class CFileItemList;
 class CVideoSettings;
 class CGUIDialogProgress;
 class CGUIDialogProgressBarHandle;
+class TiXmlNode;
 
 struct VideoAssetInfo;
 
@@ -56,7 +57,7 @@ namespace dbiplus
 
 typedef std::vector<CVideoInfoTag> VECMOVIES;
 
-namespace VIDEO
+namespace KODI::VIDEO
 {
   class IVideoInfoScannerObserver;
   struct SScanSettings;
@@ -413,6 +414,12 @@ enum class DeleteMovieCascadeAction
   ALL_ASSETS
 };
 
+enum class DeleteMovieHashAction
+{
+  HASH_DELETE,
+  HASH_PRESERVE
+};
+
 #define COMPARE_PERCENTAGE     0.90f // 90%
 #define COMPARE_PERCENTAGE_MIN 0.50f // 50%
 
@@ -584,10 +591,17 @@ public:
                            const std::map<std::string, std::string>& artwork,
                            int idShow,
                            int idEpisode = -1);
+  bool SetFileForEpisode(const std::string& fileAndPath, int idEpisode, int idFile);
+  bool SetFileForMovie(const std::string& fileAndPath, int idMovie, int idFile);
   int SetDetailsForMusicVideo(CVideoInfoTag& details,
                               const std::map<std::string, std::string>& artwork,
                               int idMVideo = -1);
-  void SetStreamDetailsForFile(const CStreamDetails& details, const std::string &strFileNameAndPath);
+  int SetStreamDetailsForFile(const CStreamDetails& details, const std::string& strFileNameAndPath);
+  /*!
+   * \brief Clear any existing stream details and add the new provided details to a file.
+   * \param[in] details New stream details
+   * \param[in] idFile Identifier of the file
+   */
   void SetStreamDetailsForFileId(const CStreamDetails& details, int idFile);
 
   bool SetSingleValue(VideoDbContentType type, int dbId, int dbField, const std::string& strValue);
@@ -601,8 +615,8 @@ public:
   int UpdateDetailsForMovie(int idMovie, CVideoInfoTag& details, const std::map<std::string, std::string> &artwork, const std::set<std::string> &updatedDetails);
 
   void DeleteMovie(int idMovie,
-                   bool bKeepId = false,
-                   DeleteMovieCascadeAction action = DeleteMovieCascadeAction::ALL_ASSETS);
+                   DeleteMovieCascadeAction action = DeleteMovieCascadeAction::ALL_ASSETS,
+                   DeleteMovieHashAction hashAction = DeleteMovieHashAction::HASH_DELETE);
   void DeleteTvShow(int idTvShow, bool bKeepId = false);
   void DeleteTvShow(const std::string& strPath);
   void DeleteSeason(int idSeason, bool bKeepId = false);
@@ -686,14 +700,17 @@ public:
   void DeleteBookMarkForEpisode(const CVideoInfoTag& tag);
   bool GetResumePoint(CVideoInfoTag& tag);
   bool GetStreamDetails(CFileItem& item);
-  bool GetStreamDetails(CVideoInfoTag& tag) const;
+  bool GetStreamDetails(CVideoInfoTag& tag);
   bool GetDetailsByTypeAndId(CFileItem& item, VideoDbContentType type, int id);
   CVideoInfoTag GetDetailsByTypeAndId(VideoDbContentType type, int id);
 
   // scraper settings
-  void SetScraperForPath(const std::string& filePath, const ADDON::ScraperPtr& info, const VIDEO::SScanSettings& settings);
+  void SetScraperForPath(const std::string& filePath,
+                         const ADDON::ScraperPtr& info,
+                         const KODI::VIDEO::SScanSettings& settings);
   ADDON::ScraperPtr GetScraperForPath(const std::string& strPath);
-  ADDON::ScraperPtr GetScraperForPath(const std::string& strPath, VIDEO::SScanSettings& settings);
+  ADDON::ScraperPtr GetScraperForPath(const std::string& strPath,
+                                      KODI::VIDEO::SScanSettings& settings);
 
   /*! \brief Retrieve the scraper and settings we should use for the specified path
    If the scraper is not set on this particular path, we'll recursively check parent folders.
@@ -703,7 +720,9 @@ public:
    \return A ScraperPtr containing the scraper information. Returns NULL if a trivial (Content == CONTENT_NONE)
            scraper or no scraper is found.
    */
-  ADDON::ScraperPtr GetScraperForPath(const std::string& strPath, VIDEO::SScanSettings& settings, bool& foundDirectly);
+  ADDON::ScraperPtr GetScraperForPath(const std::string& strPath,
+                                      KODI::VIDEO::SScanSettings& settings,
+                                      bool& foundDirectly);
 
   /*! \brief Retrieve the content type of videos in the given path
    If content is set on the folder, we return the given content type, except in the case of tvshows,
@@ -750,7 +769,9 @@ public:
   bool GetSubPaths(const std::string& basepath, std::vector< std::pair<int, std::string> >& subpaths);
 
   bool GetSourcePath(const std::string &path, std::string &sourcePath);
-  bool GetSourcePath(const std::string &path, std::string &sourcePath, VIDEO::SScanSettings& settings);
+  bool GetSourcePath(const std::string& path,
+                     std::string& sourcePath,
+                     KODI::VIDEO::SScanSettings& settings);
 
   // for music + musicvideo linkups - if no album and title given it will return the artist id, else the id of the matching video
   int GetMatchingMusicVideo(const std::string& strArtist, const std::string& strAlbum = "", const std::string& strTitle = "");
@@ -1061,20 +1082,12 @@ public:
   int AddVideoVersionType(const std::string& typeVideoVersion,
                           VideoAssetTypeOwner owner,
                           VideoAssetType assetType);
-  void AddVideoVersion(VideoDbContentType itemType,
-                       int dbId,
-                       int idVideoVersion,
-                       VideoAssetType videoAssetType,
-                       CFileItem& item);
-  void AddPrimaryVideoVersion(VideoDbContentType itemType,
-                              int dbId,
-                              int idVideoVersion,
-                              CFileItem& item);
-  void AddExtrasVideoVersion(VideoDbContentType itemType,
-                             int dbId,
-                             int idVideoVersion,
-                             CFileItem& item);
-  bool RemoveVideoVersion(int dbId);
+  void AddVideoAsset(VideoDbContentType itemType,
+                     int dbId,
+                     int idVideoVersion,
+                     VideoAssetType videoAssetType,
+                     CFileItem& item);
+  bool DeleteVideoAsset(int idFile);
   bool IsDefaultVideoVersion(int idFile);
   bool GetVideoVersionTypes(VideoDbContentType idContent,
                             VideoAssetType asset,
@@ -1099,6 +1112,13 @@ public:
   void GetSameVideoItems(const CFileItem& item, CFileItemList& items);
   int GetFileIdByMovie(int idMovie);
   std::string GetFileBasePathById(int idFile);
+
+  /*!
+   * @brief Check the passed in list of images if used in this database. Used to clean the image cache.
+   * @param imagesToCheck
+   * @return a list of the passed in images used by this database.
+   */
+  std::vector<std::string> GetUsedImages(const std::vector<std::string>& imagesToCheck);
 
 protected:
   int AddNewMovie(CVideoInfoTag& details);

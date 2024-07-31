@@ -10,6 +10,7 @@
 
 #include "ContextMenuManager.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIPassword.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
@@ -29,6 +30,7 @@
 #include "guilib/GUIWindow.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
+#include "imagefiles/ImageFileURL.h"
 #include "input/actions/Action.h"
 #include "input/actions/ActionIDs.h"
 #include "messaging/helpers/DialogOKHelper.h"
@@ -51,6 +53,7 @@
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "video/VideoDbUrl.h"
+#include "video/VideoFileItemClassify.h"
 #include "video/VideoInfoScanner.h"
 #include "video/VideoInfoTag.h"
 #include "video/VideoItemArtworkHandler.h"
@@ -70,6 +73,7 @@
 
 using namespace XFILE::VIDEODATABASEDIRECTORY;
 using namespace XFILE;
+using namespace KODI;
 using namespace KODI::MESSAGING;
 
 #define CONTROL_IMAGE                3
@@ -762,11 +766,11 @@ private:
       item->m_bIsFolder = false;
     }
 
-    item->SetProperty("playlist_type_hint", PLAYLIST::TYPE_VIDEO);
+    item->SetProperty("playlist_type_hint", static_cast<int>(PLAYLIST::Id::TYPE_VIDEO));
     const ContentUtils::PlayMode mode{item->GetProperty("CheckAutoPlayNextItem").asBoolean()
                                           ? ContentUtils::PlayMode::CHECK_AUTO_PLAY_NEXT_ITEM
                                           : ContentUtils::PlayMode::PLAY_ONLY_THIS};
-    VIDEO_UTILS::PlayItem(item, "", mode);
+    VIDEO::UTILS::PlayItem(item, "", mode);
   }
 };
 } // unnamed namespace
@@ -1067,7 +1071,8 @@ std::string CGUIDialogVideoInfo::GetThumbnail() const
 
 int CGUIDialogVideoInfo::ManageVideoItem(const std::shared_ptr<CFileItem>& item)
 {
-  if (item == nullptr || !item->IsVideoDb() || !item->HasVideoInfoTag() || item->GetVideoInfoTag()->m_iDbId < 0)
+  if (item == nullptr || !VIDEO::IsVideoDb(*item) || !item->HasVideoInfoTag() ||
+      item->GetVideoInfoTag()->m_iDbId < 0)
     return -1;
 
   CVideoDatabase database;
@@ -1976,7 +1981,11 @@ bool CGUIDialogVideoInfo::ManageVideoItemArtwork(const std::shared_ptr<CFileItem
 
   // flip selected image, if user wants it
   if (!result.empty() && flip)
-    result = CTextureUtils::GetWrappedImageURL(result, "", "flipped");
+  {
+    auto file = IMAGE_FILES::CImageFileURL::FromFile(result);
+    file.flipped = true;
+    result = file.ToString();
+  }
 
   // write the selected artwork to the database
   artHandler->PersistArt(result);

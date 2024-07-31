@@ -9,6 +9,7 @@
 #include "VideoInfoScanner.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIInfoManager.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
@@ -28,9 +29,11 @@
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
+#include "imagefiles/ImageFileURL.h"
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "messaging/helpers/DialogOKHelper.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
@@ -42,6 +45,7 @@
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
+#include "video/VideoFileItemClassify.h"
 #include "video/VideoManagerTypes.h"
 #include "video/VideoThumbLoader.h"
 #include "video/dialogs/GUIDialogVideoManagerExtras.h"
@@ -54,11 +58,12 @@
 using namespace XFILE;
 using namespace ADDON;
 using namespace KODI::MESSAGING;
+using namespace KODI::VIDEO;
 
 using KODI::MESSAGING::HELPERS::DialogResponse;
 using KODI::UTILITY::CDigest;
 
-namespace VIDEO
+namespace KODI::VIDEO
 {
 
   CVideoInfoScanner::CVideoInfoScanner()
@@ -413,7 +418,7 @@ namespace VIDEO
         break;
 
       // add video extras to library
-      if (foundSomething && !m_ignoreVideoExtras && pItem->IsVideoExtras())
+      if (foundSomething && !m_ignoreVideoExtras && IsVideoExtrasFolder(*pItem))
       {
         if (AddVideoExtras(items, content, pItem->GetPath()))
         {
@@ -427,7 +432,8 @@ namespace VIDEO
 
       // if we have a directory item (non-playlist) we then recurse into that folder
       // do not recurse for tv shows - we have already looked recursively for episodes
-      if (pItem->m_bIsFolder && !pItem->IsParentFolder() && !pItem->IsPlayList() && settings.recurse > 0 && content != CONTENT_TVSHOWS)
+      if (pItem->m_bIsFolder && !pItem->IsParentFolder() && !PLAYLIST::IsPlayList(*pItem) &&
+          settings.recurse > 0 && content != CONTENT_TVSHOWS)
       {
         if (!DoScan(pItem->GetPath()))
         {
@@ -721,8 +727,8 @@ namespace VIDEO
                                           CScraperUrl* pURL,
                                           CGUIDialogProgress* pDlgProgress)
   {
-    if (pItem->m_bIsFolder || !pItem->IsVideo() || pItem->IsNFO() ||
-       (pItem->IsPlayList() && !URIUtils::HasExtension(pItem->GetPath(), ".strm")))
+    if (pItem->m_bIsFolder || !IsVideo(*pItem) || pItem->IsNFO() ||
+        (PLAYLIST::IsPlayList(*pItem) && !URIUtils::HasExtension(pItem->GetPath(), ".strm")))
       return INFO_NOT_NEEDED;
 
     if (ProgressCancelled(pDlgProgress, 198, pItem->GetLabel()))
@@ -826,8 +832,8 @@ namespace VIDEO
                                                CScraperUrl* pURL,
                                                CGUIDialogProgress* pDlgProgress)
   {
-    if (pItem->m_bIsFolder || !pItem->IsVideo() || pItem->IsNFO() ||
-       (pItem->IsPlayList() && !URIUtils::HasExtension(pItem->GetPath(), ".strm")))
+    if (pItem->m_bIsFolder || !IsVideo(*pItem) || pItem->IsNFO() ||
+        (PLAYLIST::IsPlayList(*pItem) && !URIUtils::HasExtension(pItem->GetPath(), ".strm")))
       return INFO_NOT_NEEDED;
 
     if (ProgressCancelled(pDlgProgress, 20394, pItem->GetLabel()))
@@ -1819,8 +1825,7 @@ namespace VIDEO
         if ((addAll || CVideoThumbLoader::IsArtTypeInWhitelist(it.m_type, artTypes, exactName)) &&
           art.find(it.m_type) == art.end())
         {
-          std::string thumb = CTextureUtils::GetWrappedImageURL(pItem->GetPath(),
-                                                                "video_" + it.m_type);
+          std::string thumb = IMAGE_FILES::URLFromFile(pItem->GetPath(), "video_" + it.m_type);
           art.insert(std::make_pair(it.m_type, thumb));
         }
       }
@@ -2204,7 +2209,7 @@ namespace VIDEO
         KODI::TIME::FileTime time = pItem->m_dateTime;
         digest.Update(&time, sizeof(KODI::TIME::FileTime));
       }
-      if (pItem->IsVideo() && !pItem->IsPlayList() && !pItem->IsNFO())
+      if (IsVideo(*pItem) && !PLAYLIST::IsPlayList(*pItem) && !pItem->IsNFO())
         count++;
     }
     hash = digest.Finalize();
@@ -2484,8 +2489,9 @@ namespace VIDEO
           const int idVideoVersion = m_database.AddVideoVersionType(
               typeVideoVersion, VideoAssetTypeOwner::AUTO, VideoAssetType::EXTRA);
 
-          m_database.AddExtrasVideoVersion(ContentToVideoDbType(content), dbId, idVideoVersion,
-                                           *item.get());
+          m_database.AddVideoAsset(ContentToVideoDbType(content), dbId, idVideoVersion,
+                                   VideoAssetType::EXTRA, *item.get());
+
           CLog::Log(LOGDEBUG, "VideoInfoScanner: Added video extras {}",
                     CURL::GetRedacted(item->GetPath()));
         },

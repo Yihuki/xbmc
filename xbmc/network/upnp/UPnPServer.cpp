@@ -7,6 +7,7 @@
  */
 #include "UPnPServer.h"
 
+#include "FileItemList.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
 #include "TextureDatabase.h"
@@ -21,12 +22,15 @@
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/WindowIDs.h"
+#include "imagefiles/ImageFileURL.h"
 #include "interfaces/AnnouncementManager.h"
 #include "music/Artist.h"
 #include "music/MusicDatabase.h"
+#include "music/MusicFileItemClassify.h"
 #include "music/MusicLibraryQueue.h"
 #include "music/MusicThumbLoader.h"
 #include "music/tags/MusicInfoTag.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/Digest.h"
@@ -38,6 +42,7 @@
 #include "utils/Variant.h"
 #include "utils/log.h"
 #include "video/VideoDatabase.h"
+#include "video/VideoFileItemClassify.h"
 #include "video/VideoLibraryQueue.h"
 #include "video/VideoThumbLoader.h"
 #include "view/GUIViewState.h"
@@ -49,6 +54,8 @@
 NPT_SET_LOCAL_LOGGER("xbmc.upnp.server")
 
 using namespace ANNOUNCEMENT;
+using namespace KODI;
+using namespace KODI::VIDEO;
 using namespace XFILE;
 using KODI::UTILITY::CDigest;
 
@@ -443,12 +450,12 @@ PLT_MediaObject* CUPnPServer::Build(const std::shared_ptr<CFileItem>& item,
       }
     }
     // all playlist types are folders
-    else if (item->IsPlayList() || item->IsSmartPlayList())
+    else if (PLAYLIST::IsPlayList(*item) || PLAYLIST::IsSmartPlayList(*item))
     {
       item->m_bIsFolder = true;
     }
     // audio and not a playlist -> song, so it's not a folder
-    else if (item->IsAudio())
+    else if (MUSIC::IsAudio(*item))
     {
       item->m_bIsFolder = false;
     }
@@ -713,11 +720,11 @@ NPT_Result CUPnPServer::OnBrowseMetadata(PLT_ActionReference& action,
         parent = "sources://video/"; // this can only match video sources
     }
 
-    if (item->IsVideoDb())
+    if (IsVideoDb(*item))
     {
       thumb_loader = NPT_Reference<CThumbLoader>(new CVideoThumbLoader());
     }
-    else if (item->IsMusicDb())
+    else if (MUSIC::IsMusicDb(*item))
     {
       thumb_loader = NPT_Reference<CThumbLoader>(new CMusicThumbLoader());
     }
@@ -1306,7 +1313,7 @@ NPT_Result CUPnPServer::OnUpdateObject(PLT_ActionReference& action,
   NPT_CHECK_LABEL(FindServiceById("urn:upnp-org:serviceId:ContentDirectory", service), error);
   NPT_CHECK_LABEL(service->PauseEventing(), error);
 
-  if (updated.IsVideoDb())
+  if (IsVideoDb(updated))
   {
     CVideoDatabase db;
     NPT_CHECK_LABEL(!db.Open(), error);
@@ -1394,7 +1401,7 @@ NPT_Result CUPnPServer::OnUpdateObject(PLT_ActionReference& action,
       CVideoThumbLoader().FillLibraryArt(updated);
     }
   }
-  else if (updated.IsMusicDb())
+  else if (MUSIC::IsMusicDb(updated))
   {
     //! @todo implement this
   }
@@ -1408,9 +1415,9 @@ NPT_Result CUPnPServer::OnUpdateObject(PLT_ActionReference& action,
   if (updatelisting)
   {
     updated.SetPath(path);
-    if (updated.IsVideoDb())
+    if (IsVideoDb(updated))
       CUtil::DeleteVideoDatabaseDirectoryCache();
-    else if (updated.IsMusicDb())
+    else if (MUSIC::IsMusicDb(updated))
       CUtil::DeleteMusicDatabaseDirectoryCache();
 
     CFileItemPtr msgItem(new CFileItem(updated));
@@ -1500,7 +1507,7 @@ NPT_Result CUPnPServer::ServeFile(const NPT_HttpRequest& request,
 
   if (URIUtils::IsURL(static_cast<const char*>(file_path)))
   {
-    CURL url(CTextureUtils::UnwrapImageURL(static_cast<const char*>(file_path)));
+    CURL url(IMAGE_FILES::ToCacheKey(static_cast<const char*>(file_path)));
     std::string disp = "inline; filename=\"" + URIUtils::GetFileName(url) + "\"";
     response.GetHeaders().SetHeader("Content-Disposition", disp.c_str());
   }
@@ -1525,7 +1532,7 @@ NPT_Result CUPnPServer::ServeFile(const NPT_HttpRequest& request,
 void CUPnPServer::DefaultSortItems(CFileItemList& items)
 {
   CGUIViewState* viewState =
-      CGUIViewState::GetViewState(items.IsVideoDb() ? WINDOW_VIDEO_NAV : -1, items);
+      CGUIViewState::GetViewState(IsVideoDb(items) ? WINDOW_VIDEO_NAV : -1, items);
   if (viewState)
   {
     SortDescription sorting = viewState->GetSortMethod();

@@ -9,6 +9,7 @@
 #include "GUIWindowVideoNav.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIPassword.h"
 #include "PartyModeManager.h"
 #include "ServiceBroker.h"
@@ -27,6 +28,7 @@
 #include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "music/MusicDatabase.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "profiles/ProfileManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/MediaSettings.h"
@@ -39,6 +41,7 @@
 #include "utils/Variant.h"
 #include "utils/log.h"
 #include "video/VideoDbUrl.h"
+#include "video/VideoFileItemClassify.h"
 #include "video/VideoInfoScanner.h"
 #include "video/VideoLibraryQueue.h"
 #include "video/dialogs/GUIDialogVideoInfo.h"
@@ -48,6 +51,7 @@
 
 using namespace XFILE;
 using namespace VIDEODATABASEDIRECTORY;
+using namespace KODI;
 using namespace KODI::MESSAGING;
 
 #define CONTROL_BTNVIEWASICONS     2
@@ -152,7 +156,7 @@ bool CGUIWindowVideoNav::OnMessage(CGUIMessage& message)
             // We are here if the item is filtered out in the nav window
             const std::string& path = message.GetStringParam(0);
             CFileItem item(path, URIUtils::HasSlashAtEnd(path));
-            if (item.IsVideoDb())
+            if (VIDEO::IsVideoDb(item))
             {
               *(item.GetVideoInfoTag()) = XFILE::CVideoDatabaseFile::GetVideoTag(CURL(item.GetPath()));
               if (!item.GetVideoInfoTag()->IsEmpty())
@@ -242,7 +246,7 @@ bool CGUIWindowVideoNav::OnMessage(CGUIMessage& message)
 
 SelectFirstUnwatchedItem CGUIWindowVideoNav::GetSettingSelectFirstUnwatchedItem()
 {
-  if (m_vecItems->IsVideoDb())
+  if (VIDEO::IsVideoDb(*m_vecItems))
   {
     NODE_TYPE nodeType = CVideoDatabaseDirectory::GetDirectoryChildType(m_vecItems->GetPath());
 
@@ -358,7 +362,7 @@ bool CGUIWindowVideoNav::GetDirectory(const std::string &strDirectory, CFileItem
   bool bResult = CGUIWindowVideoBase::GetDirectory(strDirectory, items);
   if (bResult)
   {
-    if (items.IsVideoDb())
+    if (VIDEO::IsVideoDb(items))
     {
       XFILE::CVideoDatabaseDirectory dir;
       CQueryParams params;
@@ -537,7 +541,7 @@ void CGUIWindowVideoNav::UpdateButtons()
   if (m_vecItems->IsPath("special://videoplaylists/"))
     strLabel = g_localizeStrings.Get(136);
   // "{Playlist Name}"
-  else if (m_vecItems->IsPlayList())
+  else if (PLAYLIST::IsPlayList(*m_vecItems))
   {
     // get playlist name from path
     std::string strDummy;
@@ -546,7 +550,7 @@ void CGUIWindowVideoNav::UpdateButtons()
   else if (m_vecItems->IsPath("sources://video/"))
     strLabel = g_localizeStrings.Get(744);
   // everything else is from a videodb:// path
-  else if (m_vecItems->IsVideoDb())
+  else if (VIDEO::IsVideoDb(*m_vecItems))
   {
     CVideoDatabaseDirectory dir;
     dir.GetLabel(m_vecItems->GetPath(), strLabel);
@@ -671,7 +675,7 @@ void CGUIWindowVideoNav::OnDeleteItem(const CFileItemPtr& pItem)
   if (m_vecItems->IsParentFolder())
     return;
 
-  if (!m_vecItems->IsVideoDb() && !pItem->IsVideoDb())
+  if (!VIDEO::IsVideoDb(*m_vecItems) && !VIDEO::IsVideoDb(*pItem))
   {
     if (!pItem->IsPath("newsmartplaylist://video") && !pItem->IsPath("special://videoplaylists/") &&
         !pItem->IsPath("sources://video/") && !URIUtils::IsProtocol(pItem->GetPath(), "newtag"))
@@ -798,7 +802,7 @@ void CGUIWindowVideoNav::GetContextButtons(int itemNumber, CContextButtons &butt
       // can we update the database?
       if (profileManager->GetCurrentProfile().canWriteDatabases() || g_passwordManager.bMasterUser)
       {
-        if (!CVideoLibraryQueue::GetInstance().IsScanningLibrary() && item->IsVideoDb() &&
+        if (!CVideoLibraryQueue::GetInstance().IsScanningLibrary() && VIDEO::IsVideoDb(*item) &&
             item->HasVideoInfoTag() &&
             (item->GetVideoInfoTag()->m_type == MediaTypeMovie || // movies
              item->GetVideoInfoTag()->m_type == MediaTypeTvShow || // tvshows
@@ -824,18 +828,21 @@ void CGUIWindowVideoNav::GetContextButtons(int itemNumber, CContextButtons &butt
         }
       }
 
-      if (!m_vecItems->IsVideoDb() && !m_vecItems->IsVirtualDirectoryRoot())
+      if (!VIDEO::IsVideoDb(*m_vecItems) && !m_vecItems->IsVirtualDirectoryRoot())
       { // non-video db items, file operations are allowed
-        if ((CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_FILELISTS_ALLOWFILEDELETION) &&
-            CUtil::SupportsWriteFileOperations(item->GetPath())) ||
-            (inPlaylists && URIUtils::GetFileName(item->GetPath()) != "PartyMode-Video.xsp"
-                         && (item->IsPlayList() || item->IsSmartPlayList())))
+        if ((CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
+                 CSettings::SETTING_FILELISTS_ALLOWFILEDELETION) &&
+             CUtil::SupportsWriteFileOperations(item->GetPath())) ||
+            (inPlaylists && URIUtils::GetFileName(item->GetPath()) != "PartyMode-Video.xsp" &&
+             (PLAYLIST::IsPlayList(*item) || PLAYLIST::IsSmartPlayList(*item))))
         {
           buttons.Add(CONTEXT_BUTTON_DELETE, 117);
           buttons.Add(CONTEXT_BUTTON_RENAME, 118);
         }
         // add "Set/Change content" to folders
-        if (item->m_bIsFolder && !item->IsVideoDb() && !item->IsPlayList() && !item->IsSmartPlayList() && !item->IsLibraryFolder() && !item->IsLiveTV() && !item->IsPlugin() && !item->IsAddonsPath() && !URIUtils::IsUPnP(item->GetPath()))
+        if (item->m_bIsFolder && !VIDEO::IsVideoDb(*item) && !PLAYLIST::IsPlayList(*item) &&
+            !PLAYLIST::IsSmartPlayList(*item) && !item->IsLibraryFolder() && !item->IsLiveTV() &&
+            !item->IsPlugin() && !item->IsAddonsPath() && !URIUtils::IsUPnP(item->GetPath()))
         {
           if (info && info->Content() != CONTENT_NONE)
             buttons.Add(CONTEXT_BUTTON_SET_CONTENT, 20442);
@@ -1079,10 +1086,10 @@ bool CGUIWindowVideoNav::ApplyWatchedFilter(CFileItemList &items)
   ||  node == NODE_TYPE_RECENTLY_ADDED_MOVIES
   ||  node == NODE_TYPE_RECENTLY_ADDED_MUSICVIDEOS)
     filterWatched = true;
-  if (!items.IsVideoDb())
+  if (!VIDEO::IsVideoDb(items))
     filterWatched = true;
   if (items.GetContent() == "tvshows" &&
-     (items.IsSmartPlayList() || items.IsLibraryFolder()))
+      (PLAYLIST::IsSmartPlayList(items) || items.IsLibraryFolder()))
     node = NODE_TYPE_TITLE_TVSHOWS; // so that the check below works
 
   int watchMode = CMediaSettings::GetInstance().GetWatchedMode(m_vecItems->GetContent());

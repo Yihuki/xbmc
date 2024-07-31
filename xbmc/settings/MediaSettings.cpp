@@ -10,6 +10,7 @@
 
 #include "PlayListPlayer.h"
 #include "ServiceBroker.h"
+#include "TextureCache.h"
 #include "cores/RetroPlayer/RetroPlayerUtils.h"
 #include "dialogs/GUIDialogFileBrowser.h"
 #include "guilib/LocalizeStrings.h"
@@ -162,11 +163,12 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
 
   // Set music playlist player repeat and shuffle from loaded settings
   if (m_musicPlaylistRepeat)
-    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::TYPE_MUSIC, PLAYLIST::RepeatState::ALL);
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::Id::TYPE_MUSIC,
+                                                  PLAYLIST::RepeatState::ALL);
   else
-    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::TYPE_MUSIC,
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::Id::TYPE_MUSIC,
                                                   PLAYLIST::RepeatState::NONE);
-  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST::TYPE_MUSIC, m_musicPlaylistShuffle);
+  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST::Id::TYPE_MUSIC, m_musicPlaylistShuffle);
 
   // Read the watchmode settings for the various media views
   pElement = settings->FirstChildElement("myvideos");
@@ -194,11 +196,12 @@ bool CMediaSettings::Load(const TiXmlNode *settings)
 
   // Set video playlist player repeat and shuffle from loaded settings
   if (m_videoPlaylistRepeat)
-    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::TYPE_VIDEO, PLAYLIST::RepeatState::ALL);
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::Id::TYPE_VIDEO,
+                                                  PLAYLIST::RepeatState::ALL);
   else
-    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::TYPE_VIDEO,
+    CServiceBroker::GetPlaylistPlayer().SetRepeat(PLAYLIST::Id::TYPE_VIDEO,
                                                   PLAYLIST::RepeatState::NONE);
-  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST::TYPE_VIDEO, m_videoPlaylistShuffle);
+  CServiceBroker::GetPlaylistPlayer().SetShuffle(PLAYLIST::Id::TYPE_VIDEO, m_videoPlaylistShuffle);
 
   return true;
 }
@@ -364,6 +367,10 @@ void CMediaSettings::OnSettingAction(const std::shared_ptr<const CSetting>& sett
       videodatabase.ImportFromXML(path);
       videodatabase.Close();
     }
+  }
+  else if (settingId == CSettings::SETTING_MAINTENANCE_CLEANIMAGECACHE)
+  {
+    CServiceBroker::GetTextureCache()->CleanAllUnusedImages();
   }
 }
 

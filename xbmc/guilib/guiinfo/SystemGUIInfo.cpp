@@ -9,6 +9,7 @@
 #include "guilib/guiinfo/SystemGUIInfo.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIPassword.h"
 #include "LangInfo.h"
 #include "ServiceBroker.h"
@@ -143,6 +144,7 @@ bool CSystemGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case NETWORK_GATEWAY_ADDRESS:
     case NETWORK_DNS1_ADDRESS:
     case NETWORK_DNS2_ADDRESS:
+    case NETWORK_LINK_STATE:
     case SYSTEM_OS_VERSION_INFO:
     case SYSTEM_CPUFREQUENCY:
     case SYSTEM_INTERNET_STATE:
@@ -446,6 +448,13 @@ bool CSystemGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int context
       return true;
     case SYSTEM_PLATFORM_ANDROID:
 #if defined(TARGET_ANDROID)
+      value = true;
+#else
+      value = false;
+#endif
+      return true;
+    case SYSTEM_PLATFORM_WEBOS:
+#if defined(TARGET_WEBOS)
       value = true;
 #else
       value = false;

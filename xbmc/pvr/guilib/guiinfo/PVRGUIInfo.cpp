@@ -27,12 +27,14 @@
 #include "pvr/channels/PVRChannel.h"
 #include "pvr/channels/PVRChannelGroup.h"
 #include "pvr/channels/PVRChannelGroupMember.h"
+#include "pvr/channels/PVRChannelGroups.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/channels/PVRRadioRDSInfoTag.h"
 #include "pvr/epg/EpgContainer.h"
 #include "pvr/epg/EpgInfoTag.h"
 #include "pvr/epg/EpgSearchFilter.h"
 #include "pvr/guilib/PVRGUIActionsChannels.h"
+#include "pvr/guilib/PVRGUIActionsEPG.h"
 #include "pvr/providers/PVRProvider.h"
 #include "pvr/providers/PVRProviders.h"
 #include "pvr/recordings/PVRRecording.h"
@@ -360,23 +362,6 @@ std::string GetAsLocalizedDateTimeString(const CDateTime& datetime)
   return datetime.IsValid() ? datetime.GetAsLocalizedDateTime(false, false) : "";
 }
 
-std::string GetEpgTagTitle(const std::shared_ptr<const CPVREpgInfoTag>& epgTag)
-{
-  if (epgTag)
-  {
-    if (CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
-      return g_localizeStrings.Get(19266); // Parental locked
-    else if (!epgTag->Title().empty())
-      return epgTag->Title();
-  }
-
-  if (!CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(
-          CSettings::SETTING_EPG_HIDENOINFOAVAILABLE))
-    return g_localizeStrings.Get(19055); // no information available
-
-  return {};
-}
-
 } // unnamed namespace
 
 bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
@@ -424,6 +409,15 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
         return true;
       case LISTITEM_CHANNEL_NAME:
         strValue = timer->ChannelName();
+        return true;
+      case LISTITEM_CHANNEL_LOGO:
+        strValue = timer->ChannelIcon();
+        return true;
+      case LISTITEM_PVR_CLIENT_NAME:
+        strValue = CServiceBroker::GetPVRManager().GetClient(timer->ClientID())->GetClientName();
+        return true;
+      case LISTITEM_PVR_INSTANCE_NAME:
+        strValue = CServiceBroker::GetPVRManager().GetClient(timer->ClientID())->GetInstanceName();
         return true;
       case LISTITEM_EPG_EVENT_TITLE:
       case LISTITEM_EPG_EVENT_ICON:
@@ -479,7 +473,6 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
         if (recording->HasExpirationTime())
         {
           strValue = GetAsLocalizedTimeString(recording->ExpirationTimeAsLocalTime());
-          ;
           return true;
         }
         break;
@@ -513,6 +506,18 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
         if (groupMember)
         {
           strValue = groupMember->ChannelNumber().FormattedChannelNumber();
+          return true;
+        }
+        break;
+      }
+      case VIDEOPLAYER_CHANNEL_LOGO:
+      case LISTITEM_CHANNEL_LOGO:
+      {
+        const std::shared_ptr<const CPVRChannelGroupMember> groupMember =
+            CServiceBroker::GetPVRManager().Get<PVR::GUI::Channels>().GetChannelGroupMember(*item);
+        if (groupMember)
+        {
+          strValue = groupMember->Channel()->IconPath();
           return true;
         }
         break;
@@ -558,6 +563,14 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
           return true;
         }
         return false;
+      case LISTITEM_PVR_CLIENT_NAME:
+        strValue =
+            CServiceBroker::GetPVRManager().GetClient(recording->ClientID())->GetClientName();
+        return true;
+      case LISTITEM_PVR_INSTANCE_NAME:
+        strValue =
+            CServiceBroker::GetPVRManager().GetClient(recording->ClientID())->GetInstanceName();
+        return true;
     }
     return false;
   }
@@ -575,6 +588,36 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
         if (strValue.empty())
           strValue = g_localizeStrings.Get(10006); // "N/A"
         return true;
+      }
+    }
+    return false;
+  }
+
+  if (item->IsPVRChannelGroup())
+  {
+    switch (info.m_info)
+    {
+      case LISTITEM_PVR_GROUP_ORIGIN:
+      {
+        const std::shared_ptr<CPVRChannelGroup> group{
+            CServiceBroker::GetPVRManager().ChannelGroups()->GetGroupByPath(item->GetPath())};
+        if (group)
+        {
+          const CPVRChannelGroup::Origin origin{group->GetOrigin()};
+          switch (origin)
+          {
+            case CPVRChannelGroup::Origin::CLIENT:
+              strValue = g_localizeStrings.Get(856); // Client
+              return true;
+            case CPVRChannelGroup::Origin::SYSTEM:
+              strValue = g_localizeStrings.Get(857); // System
+              return true;
+            case CPVRChannelGroup::Origin::USER:
+              strValue = g_localizeStrings.Get(858); // User
+              return true;
+          }
+        }
+        break;
       }
     }
     return false;
@@ -624,7 +667,7 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
       case LISTITEM_EPG_EVENT_TITLE:
         // Note: in difference to LISTITEM_TITLE, LISTITEM_EPG_EVENT_TITLE returns the title
         // associated with the epg event of a timer, if any, and not the title of the timer.
-        strValue = GetEpgTagTitle(epgTag);
+        strValue = CServiceBroker::GetPVRManager().Get<PVR::GUI::EPG>().GetTitleForEpgTag(epgTag);
         return true;
     }
   }
@@ -755,6 +798,12 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
       case LISTITEM_PARENTAL_RATING_CODE:
         strValue = epgTag->ParentalRatingCode();
         return true;
+      case LISTITEM_PVR_CLIENT_NAME:
+        strValue = CServiceBroker::GetPVRManager().GetClient(epgTag->ClientID())->GetClientName();
+        return true;
+      case LISTITEM_PVR_INSTANCE_NAME:
+        strValue = CServiceBroker::GetPVRManager().GetClient(epgTag->ClientID())->GetInstanceName();
+        return true;
       case VIDEOPLAYER_PREMIERED:
       case LISTITEM_PREMIERED:
         if (epgTag->FirstAired().IsValid())
@@ -795,12 +844,16 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
           if (!strValue.empty())
             return true;
         }
-        // fall-thru is intended
         [[fallthrough]];
       }
       case VIDEOPLAYER_CHANNEL_NAME:
       case LISTITEM_CHANNEL_NAME:
         strValue = channel->ChannelName();
+        return true;
+      case MUSICPLAYER_CHANNEL_LOGO:
+      case VIDEOPLAYER_CHANNEL_LOGO:
+      case LISTITEM_CHANNEL_LOGO:
+        strValue = channel->IconPath();
         return true;
       case MUSICPLAYER_CHANNEL_NUMBER:
       case VIDEOPLAYER_CHANNEL_NUMBER:
@@ -825,6 +878,20 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem* item,
         strValue = channel->IsRadio() ? m_strPlayingRadioGroup : m_strPlayingTVGroup;
         return true;
       }
+      case LISTITEM_PVR_CLIENT_NAME:
+        strValue = CServiceBroker::GetPVRManager().GetClient(channel->ClientID())->GetClientName();
+        return true;
+      case LISTITEM_PVR_INSTANCE_NAME:
+        strValue =
+            CServiceBroker::GetPVRManager().GetClient(channel->ClientID())->GetInstanceName();
+        return true;
+      case LISTITEM_DATE_ADDED:
+        if (channel->DateTimeAdded().IsValid())
+        {
+          strValue = channel->DateTimeAdded().GetAsLocalizedDate();
+          return true;
+        }
+        break;
     }
   }
 
@@ -1220,8 +1287,11 @@ bool CPVRGUIInfo::GetFallbackLabel(std::string& value,
       /////////////////////////////////////////////////////////////////////////////////////////////
       case VIDEOPLAYER_TITLE:
       case MUSICPLAYER_TITLE:
-        value = GetEpgTagTitle(CPVRItem(item).GetEpgInfoTag());
+      {
+        const std::shared_ptr<const CPVREpgInfoTag> tag{CPVRItem(item).GetEpgInfoTag()};
+        value = CServiceBroker::GetPVRManager().Get<PVR::GUI::EPG>().GetTitleForEpgTag(tag);
         return !value.empty();
+      }
       default:
         break;
     }
@@ -1314,6 +1384,9 @@ bool CPVRGUIInfo::GetPVRInt(const CFileItem* item, const CGUIInfo& info, int& iV
         iValue = std::lrintf(static_cast<float>(m_iBackendDiskUsed) / m_iBackendDiskTotal * 100);
       else
         iValue = 0xFF;
+      return true;
+    case PVR_CLIENT_COUNT:
+      iValue = CServiceBroker::GetPVRManager().Clients()->EnabledClientAmount();
       return true;
   }
   return false;

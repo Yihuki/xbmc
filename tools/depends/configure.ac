@@ -190,17 +190,19 @@ case $build in
 
     # acquire build platform (native) sdk sysroot.
     build_platform=macosx
-    native_sdk_path=[`$use_xcrun --show-sdk-path`]
+    native_sdk_path=[`$use_xcrun --sdk macosx --show-sdk-path`]
     host_sysroot="$native_sdk_path"
     host_includes="${host_includes} -isysroot $native_sdk_path"
 
+    # We only set CC_FOR_BUILD as we require use_build_toolchain to be populated
+    # All other build apps are detected by AC_PATH_PROG further down
     CC_FOR_BUILD=[`$use_xcrun --find clang`]
     use_build_toolchain=[`$CC_FOR_BUILD --version | grep InstalledDir | awk '{ print $2}'`]
 
     # Android NDK currently only x86_64 prebuilts - Arctic Fox 2020.3.1
     android_toolchain_name="darwin-x86_64"
 
-    host_cxxflags="-std=c++17 -stdlib=libc++"
+    host_cxxflags="-std=c++17"
 
     if test "x$prefix" = "xNONE"; then
       prefix=/Users/Shared/xbmc-depends
@@ -263,8 +265,11 @@ case $host in
     esac
   ;;
   *darwin*)
+    # Again we set CC to find toolchain path for use in AC_PATH_TOOL macros further down
     CC=[`$use_xcrun --find clang`]
-    platform_cxx=clang++
+    # May as well just set CXX direct as platform_cxx default is g++. Setting the variable
+    # before AC_PATH_TOOL causes that macro to do nothing and just use the set variable
+    CXX=[`$use_xcrun --find clang++`]
     use_toolchain=[`$CC --version | grep InstalledDir | awk '{ print $2}'`]
 esac
 
@@ -418,7 +423,6 @@ case $host in
 
     meson_system="darwin"
 
-    platform_cflags="-fheinous-gnu-extensions"
     platform_ldflags="-Wl,-search_paths_first"
 
     case $use_platform in
@@ -493,8 +497,7 @@ case $host in
     platform_min_version="$target_platform-version-min=$target_minver"
 
     platform_includes="-arch $use_cpu -m$platform_min_version -isysroot $use_sdk_path"
-    platform_ldflags="${platform_ldflags} $platform_includes -stdlib=libc++"
-    platform_cxxflags="${platform_cxxflags} -stdlib=libc++"
+    platform_ldflags="${platform_ldflags} $platform_includes"
     deps_dir="${sdk_name}_${use_cpu}-target-${build_type}"
   ;;
   *)
@@ -667,9 +670,8 @@ fi
 
 CXXFLAGS="$platform_cxxflags $platform_includes"
 CXX_CACHED="$CXX"
-AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
+AX_CXX_COMPILE_STDCXX([20], [noext], [mandatory])
 CXX="$CXX_CACHED"
-platform_cxxflags="${platform_cxxflags} -std=c++17"
 
 if test "$ffmpeg_options" = "default"; then
   ffmpeg_options="$ffmpeg_options_default"
@@ -696,6 +698,7 @@ AC_SUBST(use_toolchain)
 AC_SUBST(use_build_toolchain)
 AC_SUBST(use_tarballs)
 AC_SUBST(target_platform)
+AC_SUBST(target_minver)
 AC_SUBST(use_firmware)
 AC_SUBST(cross_compiling)
 AC_SUBST(platform_asflags)

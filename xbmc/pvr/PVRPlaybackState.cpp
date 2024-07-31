@@ -97,8 +97,8 @@ void CPVRPlaybackState::ReInit()
 
   const std::shared_ptr<const CPVRChannelGroupsContainer> groups =
       CServiceBroker::GetPVRManager().ChannelGroups();
-  const CPVRChannelGroups* groupsTV = groups->GetTV();
-  const CPVRChannelGroups* groupsRadio = groups->GetRadio();
+  const std::shared_ptr<const CPVRChannelGroups> groupsTV{groups->GetTV()};
+  const std::shared_ptr<const CPVRChannelGroups> groupsRadio{groups->GetRadio()};
 
   m_activeGroupTV = groupsTV->GetLastOpenedGroup();
   m_activeGroupRadio = groupsRadio->GetLastOpenedGroup();
@@ -222,7 +222,7 @@ void CPVRPlaybackState::OnPlaybackStarted(const CFileItem& item)
     const std::shared_ptr<const CPVRClient> client =
         CServiceBroker::GetPVRManager().GetClient(m_playingClientId);
     if (client)
-      m_strPlayingClientName = client->GetFriendlyName();
+      m_strPlayingClientName = client->GetFullClientName();
   }
 }
 
@@ -555,7 +555,7 @@ namespace
 std::shared_ptr<CPVRChannelGroup> GetFirstNonDeletedAndNonHiddenChannelGroup(
     const std::shared_ptr<CPVRChannelGroupMember>& groupMember)
 {
-  CPVRChannelGroups* groups{
+  const std::shared_ptr<const CPVRChannelGroups> groups{
       CServiceBroker::GetPVRManager().ChannelGroups()->Get(groupMember->IsRadio())};
   if (groups)
   {

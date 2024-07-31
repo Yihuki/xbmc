@@ -28,7 +28,6 @@
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
 #include "utils/BitstreamConverter.h"
-#include "utils/BitstreamWriter.h"
 #include "utils/CPUInfo.h"
 #include "utils/StringUtils.h"
 #include "utils/TimeUtils.h"
@@ -57,6 +56,11 @@
 #include <androidjni/Surface.h>
 #include <androidjni/SurfaceTexture.h>
 #include <androidjni/UUID.h>
+
+extern "C"
+{
+#include <libavutil/intreadwrite.h>
+}
 
 using namespace KODI::MESSAGING;
 
@@ -195,13 +199,6 @@ void CMediaCodecVideoBuffer::UpdateTexImage()
   if (xbmc_jnienv()->ExceptionCheck())
   {
     CLog::Log(LOGERROR, "CMediaCodecVideoBuffer::UpdateTexImage updateTexImage:ExceptionCheck");
-    xbmc_jnienv()->ExceptionDescribe();
-    xbmc_jnienv()->ExceptionClear();
-  }
-
-  if (xbmc_jnienv()->ExceptionCheck())
-  {
-    CLog::Log(LOGERROR, "CMediaCodecVideoBuffer::UpdateTexImage getTimestamp:ExceptionCheck");
     xbmc_jnienv()->ExceptionDescribe();
     xbmc_jnienv()->ExceptionClear();
   }
@@ -632,10 +629,10 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
         offset += sizeof(annexL_hdr1);
         memcpy(m_hints.extradata.GetData() + offset, hints.extradata.GetData(), 4);
         offset += 4;
-        BS_WL32(buf, hints.height);
+        AV_WL32(buf, hints.height);
         memcpy(m_hints.extradata.GetData() + offset, buf, 4);
         offset += 4;
-        BS_WL32(buf, hints.width);
+        AV_WL32(buf, hints.width);
         memcpy(m_hints.extradata.GetData() + offset, buf, 4);
         offset += 4;
         memcpy(m_hints.extradata.GetData() + offset, annexL_hdr2, sizeof(annexL_hdr2));
@@ -843,8 +840,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
     {
       if (types[j] == m_mime)
       {
-        m_codec = std::shared_ptr<CJNIMediaCodec>(
-            new CJNIMediaCodec(CJNIMediaCodec::createByCodecName(m_codecname)));
+        m_codec = std::make_shared<CJNIMediaCodec>(CJNIMediaCodec::createByCodecName(m_codecname));
         if (xbmc_jnienv()->ExceptionCheck())
         {
           xbmc_jnienv()->ExceptionDescribe();
@@ -924,7 +920,7 @@ bool CDVDVideoCodecAndroidMediaCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptio
   m_processInfo.SetVideoDeintMethod("hardware");
   m_processInfo.SetVideoDAR(m_hints.aspect);
 
-  m_videoBufferPool = std::shared_ptr<CMediaCodecVideoBufferPool>(new CMediaCodecVideoBufferPool(m_codec));
+  m_videoBufferPool = std::make_shared<CMediaCodecVideoBufferPool>(m_codec);
 
   UpdateFpsDuration();
 
@@ -1088,13 +1084,6 @@ bool CDVDVideoCodecAndroidMediaCodec::AddData(const DemuxPacket &packet)
                                          packet.cryptoInfo->numSubSamples);
 
         cryptoInfo = new CJNIMediaCodecCryptoInfo();
-        if (CJNIBase::GetSDKVersion() < 25 &&
-            packet.cryptoInfo->mode == CJNIMediaCodec::CRYPTO_MODE_AES_CBC)
-        {
-          CLog::LogF(LOGERROR, "Device API does not support CBCS decryption");
-          return false;
-        }
-
         cryptoInfo->set(
             packet.cryptoInfo->numSubSamples, clearBytes, cipherBytes,
             std::vector<char>(std::begin(packet.cryptoInfo->kid), std::end(packet.cryptoInfo->kid)),
@@ -1842,9 +1831,9 @@ void CDVDVideoCodecAndroidMediaCodec::InitSurfaceTexture(void)
     glBindTexture(  GL_TEXTURE_EXTERNAL_OES, 0);
     m_textureId = texture_id;
 
-    m_surfaceTexture = std::shared_ptr<CJNISurfaceTexture>(new CJNISurfaceTexture(m_textureId));
+    m_surfaceTexture = std::make_shared<CJNISurfaceTexture>(m_textureId);
     // hook the surfaceTexture OnFrameAvailable callback
-    m_frameAvailable = std::shared_ptr<CDVDMediaCodecOnFrameAvailable>(new CDVDMediaCodecOnFrameAvailable(m_surfaceTexture));
+    m_frameAvailable = std::make_shared<CDVDMediaCodecOnFrameAvailable>(m_surfaceTexture);
     m_jnivideosurface = CJNISurface(*m_surfaceTexture);
   }
   else

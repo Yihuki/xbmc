@@ -125,8 +125,8 @@ void CPVRChannelSwitchingInputHandler::SwitchToChannel(const CPVRChannelNumber& 
         if (!groupMember)
         {
           // channel number present in any group?
-          const CPVRChannelGroups* groupAccess =
-              CServiceBroker::GetPVRManager().ChannelGroups()->Get(bRadio);
+          const std::shared_ptr<const CPVRChannelGroups> groupAccess{
+              CServiceBroker::GetPVRManager().ChannelGroups()->Get(bRadio)};
           const std::vector<std::shared_ptr<CPVRChannelGroup>> groups =
               groupAccess->GetMembers(true);
           for (const auto& currentGroup : groups)
@@ -215,10 +215,9 @@ bool CPVRGUIActionsChannels::HideChannel(const CFileItem& item) const
           CVariant{""}, CVariant{channel->ChannelName()}))
     return false;
 
-  if (!CServiceBroker::GetPVRManager()
-           .ChannelGroups()
-           ->GetGroupAll(channel->IsRadio())
-           ->RemoveFromGroup(groupMember))
+  const auto groups{CServiceBroker::GetPVRManager().ChannelGroups()};
+  if (!groups->Get(channel->IsRadio())
+           ->RemoveFromGroup(groups->GetGroupAll(channel->IsRadio()), groupMember))
     return false;
 
   CGUIWindowPVRBase* pvrWindow =
@@ -282,7 +281,7 @@ bool CPVRGUIActionsChannels::StartChannelScan(int clientId)
     pDialog->SetHeading(CVariant{19119}); // "On which backend do you want to search?"
 
     for (const auto& client : possibleScanClients)
-      pDialog->Add(client->GetFriendlyName());
+      pDialog->Add(client->GetFullClientName());
 
     pDialog->Open();
 
@@ -307,15 +306,13 @@ bool CPVRGUIActionsChannels::StartChannelScan(int clientId)
 
   /* start the channel scan */
   CLog::LogFC(LOGDEBUG, LOGPVR, "Starting to scan for channels on client {}",
-              scanClient->GetFriendlyName());
+              scanClient->GetFullClientName());
   auto start = std::chrono::steady_clock::now();
 
   /* do the scan */
   if (scanClient->StartChannelScan() != PVR_ERROR_NO_ERROR)
-    HELPERS::ShowOKDialogText(
-        CVariant{257}, // "Error"
-        CVariant{
-            19193}); // "The channel scan can't be started. Check the log for more information about this message."
+    HELPERS::ShowOKDialogText(CVariant{257}, // "Error"
+                              CVariant{19193}); // "The channel scan can't be started."
 
   auto end = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

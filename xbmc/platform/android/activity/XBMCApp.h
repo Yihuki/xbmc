@@ -40,7 +40,6 @@ class CVariant;
 class IInputDeviceCallbacks;
 class IInputDeviceEventHandler;
 class CVideoSyncAndroid;
-class CJNIActivityManager;
 
 typedef struct _JNIEnv JNIEnv;
 
@@ -173,15 +172,14 @@ public:
    * \param type optional type. Possible values are "", "files", "music", "videos", "pictures", "photos, "downloads"
    * \return true if external storage is available and a valid path has been stored in the path parameter
    */
-  static bool GetExternalStorage(std::string &path, const std::string &type = "");
-  static bool GetStorageUsage(const std::string &path, std::string &usage);
+  static bool GetExternalStorage(std::string& path, const std::string& type = "");
   static int GetMaxSystemVolume();
   static float GetSystemVolume();
   static void SetSystemVolume(float percent);
 
-  void SetRefreshRate(float rate);
   void SetDisplayMode(int mode, float rate);
   int GetDPI() const;
+  void SetVideoLayoutBackgroundColor(const int color);
 
   CRect MapRenderToDroid(const CRect& srcRect);
 
@@ -217,8 +215,6 @@ public:
   bool getVideosurfaceInUse();
   void setVideosurfaceInUse(bool videosurfaceInUse);
 
-  bool GetMemoryInfo(long& availMem, long& totalMem);
-
 protected:
   // limit who can access Volume
   friend class CAESinkAUDIOTRACK;
@@ -242,9 +238,9 @@ private:
   void run();
   void stop();
   void SetupEnv();
-  static void SetRefreshRateCallback(void* rateVariant);
   static void SetDisplayModeCallback(void* modeVariant);
   static void KeepScreenOnCallback(void* onVariant);
+  static void SetViewBackgroundColorCallback(void* mapVariant);
 
   static void RegisterDisplayListenerCallback(void*);
   void UnregisterDisplayListener();
@@ -257,7 +253,8 @@ private:
   bool m_hdmiSource{false};
   bool m_wakeUp{false};
   bool m_aeReset{false};
-  bool m_supportsHdmiAudioPlug{false};
+  bool m_hdmiPlugged{true};
+  bool m_mediaSessionUpdated{false};
   IInputDeviceCallbacks* m_inputDeviceCallbacks{nullptr};
   IInputDeviceEventHandler* m_inputDeviceEventHandler{nullptr};
   bool m_hasReqVisible{false};
@@ -274,8 +271,6 @@ private:
   CVideoSyncAndroid* m_syncImpl{nullptr};
   CEvent m_vsyncEvent;
   CEvent m_displayChangeEvent;
-
-  std::unique_ptr<CJNIActivityManager> m_activityManager;
 
   bool XBMC_DestroyDisplay();
   bool XBMC_SetupDisplay();

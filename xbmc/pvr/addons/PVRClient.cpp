@@ -24,8 +24,7 @@
 #include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannel.h"
 #include "pvr/channels/PVRChannelGroup.h"
-#include "pvr/channels/PVRChannelGroupAllChannels.h"
-#include "pvr/channels/PVRChannelGroupFromClient.h"
+#include "pvr/channels/PVRChannelGroupFactory.h"
 #include "pvr/channels/PVRChannelGroupMember.h"
 #include "pvr/channels/PVRChannelGroups.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
@@ -408,9 +407,22 @@ const std::string& CPVRClient::GetConnectionString() const
   return m_strConnectionString;
 }
 
-const std::string CPVRClient::GetFriendlyName() const
+std::string CPVRClient::GetClientName() const
 {
+  return Name();
+}
 
+std::string CPVRClient::GetInstanceName() const
+{
+  std::string instanceName;
+  if (Addon()->SupportsInstanceSettings())
+    Addon()->GetSettingString(ADDON_SETTING_INSTANCE_NAME_VALUE, instanceName, InstanceId());
+
+  return instanceName;
+}
+
+std::string CPVRClient::GetFullClientName() const
+{
   if (Addon()->SupportsInstanceSettings())
   {
     std::string instanceName;
@@ -710,31 +722,41 @@ PVR_ERROR CPVRClient::GetChannelGroupsAmount(int& iGroups) const
 
 PVR_ERROR CPVRClient::GetChannelGroups(CPVRChannelGroups* groups) const
 {
-  return DoAddonCall(__func__,
-                     [this, groups](const AddonInstance* addon) {
-                       PVR_HANDLE_STRUCT handle = {};
-                       handle.callerAddress = this;
-                       handle.dataAddress = groups;
-                       return addon->toAddon->GetChannelGroups(addon, &handle, groups->IsRadio());
-                     },
-                     m_clientCapabilities.SupportsChannelGroups());
+  const bool radio{groups->IsRadio()};
+  return DoAddonCall(
+      __func__,
+      [this, groups](const AddonInstance* addon)
+      {
+        PVR_HANDLE_STRUCT handle = {};
+        handle.callerAddress = this;
+        handle.dataAddress = groups;
+        return addon->toAddon->GetChannelGroups(addon, &handle, groups->IsRadio());
+      },
+      m_clientCapabilities.SupportsChannelGroups() &&
+          ((radio && m_clientCapabilities.SupportsRadio()) ||
+           (!radio && m_clientCapabilities.SupportsTV())));
 }
 
 PVR_ERROR CPVRClient::GetChannelGroupMembers(
     CPVRChannelGroup* group,
     std::vector<std::shared_ptr<CPVRChannelGroupMember>>& groupMembers) const
 {
-  return DoAddonCall(__func__,
-                     [this, group, &groupMembers](const AddonInstance* addon) {
-                       PVR_HANDLE_STRUCT handle = {};
-                       handle.callerAddress = this;
-                       handle.dataAddress = &groupMembers;
+  const bool radio{group->IsRadio()};
+  return DoAddonCall(
+      __func__,
+      [this, group, &groupMembers](const AddonInstance* addon)
+      {
+        PVR_HANDLE_STRUCT handle = {};
+        handle.callerAddress = this;
+        handle.dataAddress = &groupMembers;
 
-                       PVR_CHANNEL_GROUP tag;
-                       group->FillAddonData(tag);
-                       return addon->toAddon->GetChannelGroupMembers(addon, &handle, &tag);
-                     },
-                     m_clientCapabilities.SupportsChannelGroups());
+        PVR_CHANNEL_GROUP tag;
+        group->FillAddonData(tag);
+        return addon->toAddon->GetChannelGroupMembers(addon, &handle, &tag);
+      },
+      m_clientCapabilities.SupportsChannelGroups() &&
+          ((radio && m_clientCapabilities.SupportsRadio()) ||
+           (!radio && m_clientCapabilities.SupportsTV())));
 }
 
 PVR_ERROR CPVRClient::GetProvidersAmount(int& iProviders) const
@@ -1021,7 +1043,7 @@ PVR_ERROR CPVRClient::UpdateTimerTypes()
           CLog::LogF(LOGWARNING,
                      "Add-on {} does not support timer types. It will work, but not benefit from "
                      "the timer features introduced with PVR Addon API 2.0.0",
-                     GetFriendlyName());
+                     Name());
 
           // Create standard timer types (mostly) matching the timer functionality available in Isengard.
           // This is for migration only and does not make changes to the addons obsolete. Addons should
@@ -1686,7 +1708,7 @@ void CPVRClient::cb_transfer_channel_group(void* kodiInstance,
 
     // transfer this entry to the groups container
     CPVRChannelGroups* kodiGroups = static_cast<CPVRChannelGroups*>(handle->dataAddress);
-    const auto transferGroup = std::make_shared<CPVRChannelGroupFromClient>(
+    const auto transferGroup = kodiGroups->GetGroupFactory()->CreateClientGroup(
         *group, client->GetID(), kodiGroups->GetGroupAll());
     kodiGroups->UpdateFromClient(transferGroup);
   });
@@ -1848,7 +1870,7 @@ void CPVRClient::cb_recording_notification(void* kodiInstance,
     }
 
     const std::string strLine1 = StringUtils::Format(g_localizeStrings.Get(bOnOff ? 19197 : 19198),
-                                                     client->GetFriendlyName());
+                                                     client->GetFullClientName());
     std::string strLine2;
     if (strName)
       strLine2 = strName;
@@ -1861,7 +1883,7 @@ void CPVRClient::cb_recording_notification(void* kodiInstance,
     auto eventLog = CServiceBroker::GetEventLog();
     if (eventLog)
       eventLog->Add(EventPtr(
-          new CNotificationEvent(client->GetFriendlyName(), strLine1, client->Icon(), strLine2)));
+          new CNotificationEvent(client->GetFullClientName(), strLine1, client->Icon(), strLine2)));
 
     CLog::LogFC(LOGDEBUG, LOGPVR, "Recording {} on client {}. name='{}' filename='{}'",
                 bOnOff ? "started" : "finished", client->GetID(), strName, strFileName);

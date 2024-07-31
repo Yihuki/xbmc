@@ -32,6 +32,7 @@
 #include "utils/log.h"
 
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <memory>
 
@@ -347,7 +348,8 @@ bool CPlayerGUIInfo::GetLabel(std::string& value, const CFileItem *item, int con
     case PLAYLIST_POSITION:
     case PLAYLIST_RANDOM:
     case PLAYLIST_REPEAT:
-      value = GUIINFO::GetPlaylistLabel(info.m_info, info.GetData1());
+      value =
+          GUIINFO::GetPlaylistLabel(info.m_info, PLAYLIST::Id{static_cast<int>(info.GetData1())});
       return true;
   }
 
@@ -546,8 +548,8 @@ bool CPlayerGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int context
     case PLAYLIST_ISRANDOM:
     {
       PLAYLIST::CPlayListPlayer& player = CServiceBroker::GetPlaylistPlayer();
-      PLAYLIST::Id playlistid = info.GetData1();
-      if (info.GetData2() > 0 && playlistid != PLAYLIST::TYPE_NONE)
+      PLAYLIST::Id playlistid = PLAYLIST::Id{static_cast<int>(info.GetData1())};
+      if (info.GetData2() > 0 && playlistid != PLAYLIST::Id::TYPE_NONE)
         value = player.IsShuffled(playlistid);
       else
         value = player.IsShuffled(player.GetCurrentPlaylist());
@@ -556,8 +558,8 @@ bool CPlayerGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int context
     case PLAYLIST_ISREPEAT:
     {
       PLAYLIST::CPlayListPlayer& player = CServiceBroker::GetPlaylistPlayer();
-      PLAYLIST::Id playlistid = info.GetData1();
-      if (info.GetData2() > 0 && playlistid != PLAYLIST::TYPE_NONE)
+      PLAYLIST::Id playlistid = PLAYLIST::Id{static_cast<int>(info.GetData1())};
+      if (info.GetData2() > 0 && playlistid != PLAYLIST::Id::TYPE_NONE)
         value = (player.GetRepeat(playlistid) == PLAYLIST::RepeatState::ALL);
       else
         value = player.GetRepeat(player.GetCurrentPlaylist()) == PLAYLIST::RepeatState::ALL;
@@ -566,8 +568,8 @@ bool CPlayerGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int context
     case PLAYLIST_ISREPEATONE:
     {
       PLAYLIST::CPlayListPlayer& player = CServiceBroker::GetPlaylistPlayer();
-      PLAYLIST::Id playlistid = info.GetData1();
-      if (info.GetData2() > 0 && playlistid != PLAYLIST::TYPE_NONE)
+      PLAYLIST::Id playlistid = PLAYLIST::Id{static_cast<int>(info.GetData1())};
+      if (info.GetData2() > 0 && playlistid != PLAYLIST::Id::TYPE_NONE)
         value = (player.GetRepeat(playlistid) == PLAYLIST::RepeatState::ONE);
       else
         value = player.GetRepeat(player.GetCurrentPlaylist()) == PLAYLIST::RepeatState::ONE;
@@ -590,7 +592,7 @@ bool CPlayerGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int context
       {
         if (item->HasProperty("playlistposition"))
         {
-          value = static_cast<int>(item->GetProperty("playlisttype").asInteger()) ==
+          value = PLAYLIST::Id{item->GetProperty("playlisttype").asInteger32()} ==
                       CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist() &&
                   static_cast<int>(item->GetProperty("playlistposition").asInteger()) ==
                       CServiceBroker::GetPlaylistPlayer().GetCurrentItemIdx();
@@ -671,8 +673,8 @@ std::vector<std::pair<float, float>> CPlayerGUIInfo::GetEditList(const CDataCach
   const std::vector<EDL::Edit>& edits = data.GetEditList();
   for (const auto& edit : edits)
   {
-    float editStart = edit.start * 100.0f / duration;
-    float editEnd = edit.end * 100.0f / duration;
+    float editStart = edit.start.count() * 100.0f / duration;
+    float editEnd = edit.end.count() * 100.0f / duration;
     ranges.emplace_back(editStart, editEnd);
   }
   return ranges;
@@ -683,11 +685,11 @@ std::vector<std::pair<float, float>> CPlayerGUIInfo::GetCuts(const CDataCacheCor
 {
   std::vector<std::pair<float, float>> ranges;
 
-  const std::vector<int64_t>& cuts = data.GetCuts();
+  const std::vector<std::chrono::milliseconds>& cuts = data.GetCuts();
   float lastMarker = 0.0f;
   for (const auto& cut : cuts)
   {
-    float marker = cut * 100.0f / duration;
+    float marker = cut.count() * 100.0f / duration;
     if (marker != 0)
       ranges.emplace_back(lastMarker, marker);
 
@@ -701,11 +703,11 @@ std::vector<std::pair<float, float>> CPlayerGUIInfo::GetSceneMarkers(const CData
 {
   std::vector<std::pair<float, float>> ranges;
 
-  const std::vector<int64_t>& scenes = data.GetSceneMarkers();
+  const std::vector<std::chrono::milliseconds>& scenes = data.GetSceneMarkers();
   float lastMarker = 0.0f;
   for (const auto& scene : scenes)
   {
-    float marker = scene * 100.0f / duration;
+    float marker = scene.count() * 100.0f / duration;
     if (marker != 0)
       ranges.emplace_back(lastMarker, marker);
 

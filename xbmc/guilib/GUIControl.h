@@ -175,7 +175,7 @@ public:
   bool IsVisibleFromSkin() const { return m_visibleFromSkinCondition; }
   virtual bool IsDisabled() const;
   virtual void SetPosition(float posX, float posY);
-  virtual void SetHitRect(const CRect& rect, const UTILS::COLOR::Color& color);
+  virtual void SetHitRect(const CRect& rect, const KODI::UTILS::COLOR::Color& color);
   virtual void SetCamera(const CPoint &camera);
   virtual void SetStereoFactor(const float &factor);
   bool SetColorDiffuse(const KODI::GUILIB::GUIINFO::CGUIInfoColor &color);
@@ -184,6 +184,7 @@ public:
   virtual float GetYPosition() const;
   virtual float GetWidth() const;
   virtual float GetHeight() const;
+  virtual void AssignDepth();
 
   void MarkDirtyRegion(const unsigned int dirtyState = DIRTY_STATE_CONTROL);
   bool IsControlDirty() const { return m_controlDirtyState != 0; }
@@ -306,6 +307,11 @@ public:
   };
   GUICONTROLTYPES GetControlType() const { return ControlType; }
 
+  /*! \brief Test whether the control is "drawable" (not a group or similar)
+   \return true if the control has textures/labels it wants to render
+   */
+  bool IsControlRenderable();
+
   enum GUIVISIBLE { HIDDEN = 0, DELAYED, VISIBLE };
 
   enum GUISCROLLVALUE { FOCUS = 0, NEVER, ALWAYS };
@@ -348,7 +354,7 @@ protected:
   float m_height;
   float m_width;
   CRect m_hitRect;
-  UTILS::COLOR::Color m_hitColor = 0xffffffff;
+  KODI::UTILS::COLOR::Color m_hitColor = 0xffffffff;
   KODI::GUILIB::GUIINFO::CGUIInfoColor m_diffuseColor;
   int m_controlID;
   int m_parentID;

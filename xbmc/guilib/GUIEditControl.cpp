@@ -548,6 +548,9 @@ void CGUIEditControl::ProcessText(unsigned int currentTime)
 
 void CGUIEditControl::RenderText()
 {
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() ==
+      RENDER_ORDER_FRONT_TO_BACK)
+    return;
   m_label.Render();
 
   if (CServiceBroker::GetWinSystem()->GetGfxContext().SetClipRegion(m_clipRect.x1, m_clipRect.y1, m_clipRect.Width(), m_clipRect.Height()))
@@ -596,10 +599,10 @@ bool CGUIEditControl::SetStyledText(const std::wstring &text)
   vecText styled;
   styled.reserve(text.size() + 1);
 
-  std::vector<UTILS::COLOR::Color> colors;
+  std::vector<KODI::UTILS::COLOR::Color> colors;
   colors.push_back(m_label.GetLabelInfo().textColor);
   colors.push_back(m_label.GetLabelInfo().disabledColor);
-  UTILS::COLOR::Color select = m_label.GetLabelInfo().selectedColor;
+  KODI::UTILS::COLOR::Color select = m_label.GetLabelInfo().selectedColor;
   if (!select)
     select = 0xFFFF0000;
   colors.push_back(select);

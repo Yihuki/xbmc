@@ -110,15 +110,27 @@ void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
 
 void CGUIButtonControl::Render()
 {
-  m_imgFocus->Render();
-  m_imgNoFocus->Render();
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() ==
+      RENDER_ORDER_FRONT_TO_BACK)
+  {
+    m_imgNoFocus->Render();
+    m_imgFocus->Render(-1);
+  }
+  else
+  {
+    m_imgFocus->Render(-1);
+    m_imgNoFocus->Render();
+    RenderText();
+  }
 
-  RenderText();
   CGUIControl::Render();
 }
 
 void CGUIButtonControl::RenderText()
 {
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() ==
+      RENDER_ORDER_FRONT_TO_BACK)
+    return;
   m_label.Render();
   m_label2.Render();
 }
@@ -363,9 +375,9 @@ std::string CGUIButtonControl::GetLabel2() const
 
 void CGUIButtonControl::PythonSetLabel(const std::string& strFont,
                                        const std::string& strText,
-                                       UTILS::COLOR::Color textColor,
-                                       UTILS::COLOR::Color shadowColor,
-                                       UTILS::COLOR::Color focusedColor)
+                                       KODI::UTILS::COLOR::Color textColor,
+                                       KODI::UTILS::COLOR::Color shadowColor,
+                                       KODI::UTILS::COLOR::Color focusedColor)
 {
   m_label.GetLabelInfo().font = g_fontManager.GetFont(strFont);
   m_label.GetLabelInfo().textColor = textColor;
@@ -374,7 +386,7 @@ void CGUIButtonControl::PythonSetLabel(const std::string& strFont,
   SetLabel(strText);
 }
 
-void CGUIButtonControl::PythonSetDisabledColor(UTILS::COLOR::Color disabledColor)
+void CGUIButtonControl::PythonSetDisabledColor(KODI::UTILS::COLOR::Color disabledColor)
 {
   m_label.GetLabelInfo().disabledColor = disabledColor;
 }

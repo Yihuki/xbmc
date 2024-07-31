@@ -12,13 +12,18 @@
 #include "ServiceBroker.h"
 #include "URL.h"
 #include "Util.h"
+#include "music/MusicFileItemClassify.h"
 #include "music/tags/MusicInfoTag.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
+#include "video/VideoFileItemClassify.h"
 #include "video/VideoInfoTag.h"
+
+using namespace KODI;
 
 CExecString::CExecString(const std::string& execString)
 {
@@ -102,7 +107,7 @@ bool CExecString::Parse(const CFileItem& item, const std::string& contextWindow)
   }
   else if (item.m_bIsFolder &&
            (CServiceBroker::GetSettingsComponent()->GetAdvancedSettings()->m_playlistAsFolders ||
-            !(item.IsSmartPlayList() || item.IsPlayList())))
+            !(PLAYLIST::IsSmartPlayList(item) || PLAYLIST::IsPlayList(item))))
   {
     if (!contextWindow.empty())
       Build("ActivateWindow", {contextWindow, StringUtils::Paramify(item.GetPath()), "return"});
@@ -123,9 +128,9 @@ bool CExecString::Parse(const CFileItem& item, const std::string& contextWindow)
     Build("StartAndroidActivity", {StringUtils::Paramify(item.GetPath().substr(26))});
   else // assume a media file
   {
-    if (item.IsVideoDb() && item.HasVideoInfoTag())
+    if (VIDEO::IsVideoDb(item) && item.HasVideoInfoTag())
       BuildPlayMedia(item, StringUtils::Paramify(item.GetVideoInfoTag()->m_strFileNameAndPath));
-    else if (item.IsMusicDb() && item.HasMusicInfoTag())
+    else if (MUSIC::IsMusicDb(item) && item.HasMusicInfoTag())
       BuildPlayMedia(item, StringUtils::Paramify(item.GetMusicInfoTag()->GetURL()));
     else if (item.IsPicture())
       Build("ShowPicture", {StringUtils::Paramify(item.GetPath())});

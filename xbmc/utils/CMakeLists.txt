@@ -2,11 +2,11 @@ set(SOURCES ActorProtocol.cpp
             AlarmClock.cpp
             AliasShortcutUtils.cpp
             Archive.cpp
+            ArtUtils.cpp
             Base64.cpp
             BitstreamConverter.cpp
             BitstreamReader.cpp
             BitstreamStats.cpp
-            BitstreamWriter.cpp
             BooleanLogic.cpp
             CharArrayParser.cpp
             CharsetConverter.cpp
@@ -51,7 +51,6 @@ set(SOURCES ActorProtocol.cpp
             PlayerUtils.cpp
             RecentlyAddedJob.cpp
             RegExp.cpp
-            rfft.cpp
             RingBuffer.cpp
             RssManager.cpp
             RssReader.cpp
@@ -84,11 +83,11 @@ set(HEADERS ActorProtocol.h
             AlarmClock.h
             AliasShortcutUtils.h
             Archive.h
+            ArtUtils.h
             Base64.h
             BitstreamConverter.h
             BitstreamReader.h
             BitstreamStats.h
-            BitstreamWriter.h
             BooleanLogic.h
             CharArrayParser.h
             CharsetConverter.h
@@ -154,7 +153,6 @@ set(HEADERS ActorProtocol.h
             ProgressJob.h
             RecentlyAddedJob.h
             RegExp.h
-            rfft.h
             RingBuffer.h
             RssManager.h
             RssReader.h
@@ -187,11 +185,11 @@ set(HEADERS ActorProtocol.h
             XMLUtils.h
             XTimeUtils.h)
 
-if(TARGET XSLT::XSLT)
+if(TARGET ${APP_NAME_LC}::XSLT)
   list(APPEND SOURCES XSLTUtils.cpp)
   list(APPEND HEADERS XSLTUtils.h)
 endif()
-if(TARGET EGL::EGL)
+if(TARGET ${APP_NAME_LC}::EGL)
   list(APPEND SOURCES EGLUtils.cpp
                       EGLFence.cpp)
   list(APPEND HEADERS EGLUtils.h
@@ -203,7 +201,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
   set_source_files_properties(Mime.cpp PROPERTIES COMPILE_FLAGS -O0)
 endif()
 
-if(TARGET OpenGL::GL OR TARGET OpenGL::GLES)
+if(TARGET ${APP_NAME_LC}::OpenGl OR TARGET ${APP_NAME_LC}::OpenGLES)
   list(APPEND SOURCES GLUtils.cpp)
   list(APPEND HEADERS GLUtils.h)
 endif()
@@ -234,17 +232,17 @@ if("gbm" IN_LIST CORE_PLATFORM_NAME_LC OR "wayland" IN_LIST CORE_PLATFORM_NAME_L
     list(APPEND HEADERS GBMBufferObject.h)
   endif()
 
-  if(TARGET EGL::EGL)
+  if(TARGET ${APP_NAME_LC}::EGL)
     list(APPEND SOURCES EGLImage.cpp)
     list(APPEND HEADERS EGLImage.h)
   endif()
 
-  if(TARGET LIBDRM::LIBDRM)
+  if(TARGET ${APP_NAME_LC}::LibDRM)
     list(APPEND SOURCES DRMHelpers.cpp)
     list(APPEND HEADERS DRMHelpers.h)
   endif()
 
-  if(LIBDISPLAYINFO_FOUND)
+  if(TARGET ${APP_NAME_LC}::LibDisplayInfo)
     list(APPEND SOURCES DisplayInfo.cpp)
     list(APPEND HEADERS DisplayInfo.h)
   endif()

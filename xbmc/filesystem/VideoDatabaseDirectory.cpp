@@ -10,6 +10,7 @@
 
 #include "File.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "VideoDatabaseDirectory/QueryParams.h"
 #include "guilib/LocalizeStrings.h"
@@ -105,7 +106,7 @@ bool CVideoDatabaseDirectory::GetDirectory(const CURL& url, CFileItemList &items
       if (!strImage.empty() && CServiceBroker::GetGUI()->GetTextureManager().HasTexture(strImage))
         item->SetArt("icon", strImage);
     }
-    if (item->GetVideoInfoTag())
+    if (item->HasVideoInfoTag())
     {
       item->SetDynPath(item->GetVideoInfoTag()->GetPath());
     }

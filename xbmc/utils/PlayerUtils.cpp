@@ -14,6 +14,8 @@
 #include "utils/Variant.h"
 #include "video/guilib/VideoGUIUtils.h"
 
+using namespace KODI;
+
 bool CPlayerUtils::IsItemPlayable(const CFileItem& itemIn)
 {
   const CFileItem item(itemIn.GetItemToPlay());
@@ -31,7 +33,7 @@ bool CPlayerUtils::IsItemPlayable(const CFileItem& itemIn)
     return true;
 
   // Movies / TV Shows / Music Videos
-  if (VIDEO_UTILS::IsItemPlayable(item))
+  if (VIDEO::UTILS::IsItemPlayable(item))
     return true;
 
   //! @todo add more types on demand.
@@ -39,7 +41,7 @@ bool CPlayerUtils::IsItemPlayable(const CFileItem& itemIn)
   return false;
 }
 
-void CPlayerUtils::AdvanceTempoStep(std::shared_ptr<CApplicationPlayer> appPlayer,
+void CPlayerUtils::AdvanceTempoStep(const std::shared_ptr<CApplicationPlayer>& appPlayer,
                                     TempoStepChange change)
 {
   const auto step = 0.1f;

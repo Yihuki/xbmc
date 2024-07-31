@@ -9,6 +9,7 @@
 #include "MusicUtils.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIPassword.h"
 #include "PartyModeManager.h"
 #include "PlayListPlayer.h"
@@ -28,9 +29,12 @@
 #include "media/MediaType.h"
 #include "music/MusicDatabase.h"
 #include "music/MusicDbUrl.h"
+#include "music/MusicFileItemClassify.h"
 #include "music/tags/MusicInfoTag.h"
+#include "network/NetworkFileItemClassify.h"
 #include "playlists/PlayList.h"
 #include "playlists/PlayListFactory.h"
+#include "playlists/PlayListFileItemClassify.h"
 #include "profiles/ProfileManager.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
@@ -40,10 +44,13 @@
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/log.h"
+#include "video/VideoFileItemClassify.h"
 #include "view/GUIViewState.h"
 
 #include <memory>
 
+using namespace KODI;
+using namespace KODI::VIDEO;
 using namespace MUSIC_INFO;
 using namespace XFILE;
 using namespace std::chrono_literals;
@@ -134,7 +141,7 @@ public:
       */
     bool clearcache(false);
     const PLAYLIST::CPlayList& playlist =
-        CServiceBroker::GetPlaylistPlayer().GetPlaylist(PLAYLIST::TYPE_MUSIC);
+        CServiceBroker::GetPlaylistPlayer().GetPlaylist(PLAYLIST::Id::TYPE_MUSIC);
 
     for (int i = 0; i < playlist.size(); ++i)
     {
@@ -500,7 +507,7 @@ void CAsyncGetItemsForPlaylist::GetItemsForPlaylist(const std::shared_ptr<CFileI
   if (item->IsParentFolder() || !item->CanQueue() || item->IsRAR() || item->IsZIP())
     return;
 
-  if (item->IsMusicDb() && item->m_bIsFolder && !item->IsParentFolder())
+  if (MUSIC::IsMusicDb(*item) && item->m_bIsFolder && !item->IsParentFolder())
   {
     // we have a music database folder, just grab the "all" item underneath it
     XFILE::CMusicDatabaseDirectory dir;
@@ -575,7 +582,7 @@ void CAsyncGetItemsForPlaylist::GetItemsForPlaylist(const std::shared_ptr<CFileI
   }
   else
   {
-    if (item->IsPlayList())
+    if (PLAYLIST::IsPlayList(*item))
     {
       const std::unique_ptr<PLAYLIST::CPlayList> playList(
           PLAYLIST::CPlayListFactory::Create(*item));
@@ -596,7 +603,7 @@ void CAsyncGetItemsForPlaylist::GetItemsForPlaylist(const std::shared_ptr<CFileI
         GetItemsForPlaylist((*playList)[i]);
       }
     }
-    else if (item->IsInternetStream() && !item->IsMusicDb())
+    else if (NETWORK::IsInternetStream(*item) && !MUSIC::IsMusicDb(*item))
     {
       // just queue the internet stream, it will be expanded on play
       m_queuedItems.Add(item);
@@ -606,7 +613,7 @@ void CAsyncGetItemsForPlaylist::GetItemsForPlaylist(const std::shared_ptr<CFileI
       // python files can be played
       m_queuedItems.Add(item);
     }
-    else if (!item->IsNFO() && (item->IsAudio() || item->IsVideo()))
+    else if (!item->IsNFO() && (MUSIC::IsAudio(*item) || IsVideo(*item)))
     {
       const auto itemCheck = m_queuedItems.Get(item->GetPath());
       if (!itemCheck || itemCheck->GetStartOffset() != item->GetStartOffset())
@@ -663,12 +670,12 @@ void AddItemToPlayListAndPlay(const std::shared_ptr<CFileItem>& itemToQueue,
   MUSIC_UTILS::GetItemsForPlayList(itemToQueue, queuedItems);
 
   auto& playlistPlayer = CServiceBroker::GetPlaylistPlayer();
-  playlistPlayer.ClearPlaylist(PLAYLIST::TYPE_MUSIC);
+  playlistPlayer.ClearPlaylist(PLAYLIST::Id::TYPE_MUSIC);
   playlistPlayer.Reset();
-  playlistPlayer.Add(PLAYLIST::TYPE_MUSIC, queuedItems);
+  playlistPlayer.Add(PLAYLIST::Id::TYPE_MUSIC, queuedItems);
 
   // figure out where to start playback
-  PLAYLIST::CPlayList& playList = playlistPlayer.GetPlaylist(PLAYLIST::TYPE_MUSIC);
+  PLAYLIST::CPlayList& playList = playlistPlayer.GetPlaylist(PLAYLIST::Id::TYPE_MUSIC);
   int pos = 0;
   if (itemToPlay)
   {
@@ -681,13 +688,13 @@ void AddItemToPlayListAndPlay(const std::shared_ptr<CFileItem>& itemToQueue,
     }
   }
 
-  if (playlistPlayer.IsShuffled(PLAYLIST::TYPE_MUSIC))
+  if (playlistPlayer.IsShuffled(PLAYLIST::Id::TYPE_MUSIC))
   {
     playList.Swap(0, playList.FindOrder(pos));
     pos = 0;
   }
 
-  playlistPlayer.SetCurrentPlaylist(PLAYLIST::TYPE_MUSIC);
+  playlistPlayer.SetCurrentPlaylist(PLAYLIST::Id::TYPE_MUSIC);
   playlistPlayer.Play(pos, player);
 }
 } // unnamed namespace
@@ -757,7 +764,7 @@ void PlayItem(const std::shared_ptr<CFileItem>& itemIn,
       // song, so just play it
       auto& playlistPlayer = CServiceBroker::GetPlaylistPlayer();
       playlistPlayer.Reset();
-      playlistPlayer.SetCurrentPlaylist(PLAYLIST::TYPE_NONE);
+      playlistPlayer.SetCurrentPlaylist(PLAYLIST::Id::TYPE_NONE);
       playlistPlayer.Play(item, player);
     }
   }
@@ -779,17 +786,17 @@ void QueueItem(const std::shared_ptr<CFileItem>& itemIn, QueuePosition pos)
   auto& player = CServiceBroker::GetPlaylistPlayer();
 
   PLAYLIST::Id playlistId = player.GetCurrentPlaylist();
-  if (playlistId == PLAYLIST::TYPE_NONE)
+  if (playlistId == PLAYLIST::Id::TYPE_NONE)
   {
     const auto& components = CServiceBroker::GetAppComponents();
     playlistId = components.GetComponent<CApplicationPlayer>()->GetPreferredPlaylist();
   }
 
-  if (playlistId == PLAYLIST::TYPE_NONE)
-    playlistId = PLAYLIST::TYPE_MUSIC;
+  if (playlistId == PLAYLIST::Id::TYPE_NONE)
+    playlistId = PLAYLIST::Id::TYPE_MUSIC;
 
   // Check for the partymode playlist item, do nothing when "PartyMode.xsp" not exists
-  if (item->IsSmartPlayList() && !CFileUtils::Exists(item->GetPath()))
+  if (PLAYLIST::IsSmartPlayList(*item) && !CFileUtils::Exists(item->GetPath()))
   {
     const auto profileManager = CServiceBroker::GetSettingsComponent()->GetProfileManager();
     if (item->GetPath() == profileManager->GetUserDataItem("PartyMode.xsp"))
@@ -857,7 +864,7 @@ namespace
 {
 bool IsNonExistingUserPartyModePlaylist(const CFileItem& item)
 {
-  if (!item.IsSmartPlayList())
+  if (!PLAYLIST::IsSmartPlayList(item))
     return false;
 
   const std::string& path{item.GetPath()};
@@ -873,7 +880,7 @@ bool IsItemPlayable(const CFileItem& item)
     return false;
 
   // Exclude all video library items
-  if (item.IsVideoDb() || StringUtils::StartsWithNoCase(item.GetPath(), "library://video/"))
+  if (IsVideoDb(item) || StringUtils::StartsWithNoCase(item.GetPath(), "library://video/"))
     return false;
 
   // Exclude other components
@@ -886,7 +893,7 @@ bool IsItemPlayable(const CFileItem& item)
     return false;
 
   // Include playlists located at one of the possible music playlist locations
-  if (item.IsPlayList())
+  if (PLAYLIST::IsPlayList(item))
   {
     if (StringUtils::StartsWithNoCase(item.GetMimeType(), "audio/"))
       return true;
@@ -913,7 +920,7 @@ bool IsItemPlayable(const CFileItem& item)
     return false;
 
   if (item.m_bIsFolder &&
-      (item.IsMusicDb() || StringUtils::StartsWithNoCase(item.GetPath(), "library://music/")))
+      (MUSIC::IsMusicDb(item) || StringUtils::StartsWithNoCase(item.GetPath(), "library://music/")))
   {
     // Exclude top level nodes - eg can't play 'genres' just a specific genre etc
     const XFILE::MUSICDATABASEDIRECTORY::NODE_TYPE node =
@@ -926,7 +933,7 @@ bool IsItemPlayable(const CFileItem& item)
 
   if (item.HasMusicInfoTag() && item.CanQueue())
     return true;
-  else if (!item.m_bIsFolder && item.IsAudio())
+  else if (!item.m_bIsFolder && MUSIC::IsAudio(item))
     return true;
   else if (item.m_bIsFolder)
   {

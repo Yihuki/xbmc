@@ -9,6 +9,7 @@
 #include "GUIWindowPVRBase.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
 #include "addons/AddonManager.h"
@@ -217,7 +218,8 @@ bool CGUIWindowPVRBase::ActivatePreviousChannelGroup()
   const std::shared_ptr<const CPVRChannelGroup> channelGroup = GetChannelGroup();
   if (channelGroup)
   {
-    const CPVRChannelGroups* groups = CServiceBroker::GetPVRManager().ChannelGroups()->Get(channelGroup->IsRadio());
+    const std::shared_ptr<const CPVRChannelGroups> groups{
+        CServiceBroker::GetPVRManager().ChannelGroups()->Get(channelGroup->IsRadio())};
     if (groups)
     {
       SetChannelGroup(groups->GetPreviousGroup(*channelGroup));
@@ -232,7 +234,8 @@ bool CGUIWindowPVRBase::ActivateNextChannelGroup()
   const std::shared_ptr<const CPVRChannelGroup> channelGroup = GetChannelGroup();
   if (channelGroup)
   {
-    const CPVRChannelGroups* groups = CServiceBroker::GetPVRManager().ChannelGroups()->Get(channelGroup->IsRadio());
+    const std::shared_ptr<const CPVRChannelGroups> groups{
+        CServiceBroker::GetPVRManager().ChannelGroups()->Get(channelGroup->IsRadio())};
     if (groups)
     {
       SetChannelGroup(groups->GetNextGroup(*channelGroup));
@@ -422,7 +425,7 @@ bool CGUIWindowPVRBase::OpenChannelGroupSelectionDialog()
 
       auto client = pvrMgr.GetClient(channelGroup->GetClientID());
       if (client)
-        selectedClient = client->GetFriendlyName();
+        selectedClient = client->GetFullClientName();
     }
 
     CPVRThumbLoader loader;
@@ -432,7 +435,7 @@ bool CGUIWindowPVRBase::OpenChannelGroupSelectionDialog()
       // set client name as label2
       const std::shared_ptr<const CPVRClient> client = pvrMgr.GetClient(*group);
       if (client)
-        group->SetLabel2(client->GetFriendlyName());
+        group->SetLabel2(client->GetFullClientName());
 
       // set thumbnail
       loader.LoadItem(group.get());

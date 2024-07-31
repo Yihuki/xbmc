@@ -9,6 +9,7 @@
 #include "PVRGUIActionsPlayback.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "application/ApplicationEnums.h"
 #include "cores/DataCacheCore.h"
@@ -48,6 +49,7 @@
 #include <string>
 #include <vector>
 
+using namespace KODI;
 using namespace PVR;
 using namespace KODI::MESSAGING;
 
@@ -82,7 +84,7 @@ bool CPVRGUIActionsPlayback::CheckResumeRecording(const CFileItem& item) const
 
 bool CPVRGUIActionsPlayback::ResumePlayRecording(const CFileItem& item, bool bFallbackToPlay) const
 {
-  if (VIDEO_UTILS::GetItemResumeInformation(item).isResumable)
+  if (VIDEO::UTILS::GetItemResumeInformation(item).isResumable)
   {
     const_cast<CFileItem*>(&item)->SetStartOffset(STARTOFFSET_RESUME);
   }
@@ -125,7 +127,7 @@ bool CPVRGUIActionsPlayback::PlayRecording(const CFileItem& item, bool bCheckRes
 
   if (!bCheckResume || CheckResumeRecording(item))
   {
-    if (!item.m_bIsFolder && VIDEO_UTILS::IsAutoPlayNextItem(item))
+    if (!item.m_bIsFolder && VIDEO::UTILS::IsAutoPlayNextItem(item))
     {
       // recursively add items located in the same folder as item to play list, starting with item
       std::string parentPath = item.GetProperty("ParentPath").asString();
@@ -143,7 +145,7 @@ bool CPVRGUIActionsPlayback::PlayRecording(const CFileItem& item, bool bCheckRes
         parentItem->SetStartOffset(STARTOFFSET_RESUME);
 
       auto queuedItems = std::make_unique<CFileItemList>();
-      VIDEO_UTILS::GetItemsForPlayList(parentItem, *queuedItems);
+      VIDEO::UTILS::GetItemsForPlayList(parentItem, *queuedItems);
 
       // figure out where to start playback
       int pos = 0;
@@ -179,7 +181,7 @@ bool CPVRGUIActionsPlayback::PlayRecordingFolder(const CFileItem& item, bool bCh
     // recursively add items to list
     const auto itemToQueue = std::make_shared<CFileItem>(item);
     auto queuedItems = std::make_unique<CFileItemList>();
-    VIDEO_UTILS::GetItemsForPlayList(itemToQueue, *queuedItems);
+    VIDEO::UTILS::GetItemsForPlayList(itemToQueue, *queuedItems);
 
     CServiceBroker::GetAppMessenger()->PostMsg(TMSG_MEDIA_PLAY, 0, -1,
                                                static_cast<void*>(queuedItems.release()));
@@ -319,9 +321,8 @@ bool CPVRGUIActionsPlayback::SwitchToChannel(const CFileItem& item, bool bCheckR
   {
     const std::string channelName =
         channel ? channel->ChannelName() : g_localizeStrings.Get(19029); // Channel
-    const std::string msg = StringUtils::Format(
-        g_localizeStrings.Get(19035),
-        channelName); // CHANNELNAME could not be played. Check the log for details.
+    const std::string msg = StringUtils::Format(g_localizeStrings.Get(19035),
+                                                channelName); // CHANNELNAME could not be played.
 
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Error, g_localizeStrings.Get(19166),
                                           msg); // PVR information
@@ -405,9 +406,7 @@ bool CPVRGUIActionsPlayback::SwitchToChannel(PlaybackType type) const
       g_localizeStrings.Get(19166), // PVR information
       StringUtils::Format(
           g_localizeStrings.Get(19035),
-          g_localizeStrings.Get(
-              bIsRadio ? 19021
-                       : 19020))); // Radio/TV could not be played. Check the log for details.
+          g_localizeStrings.Get(bIsRadio ? 19021 : 19020))); // Radio/TV could not be played.
   return false;
 }
 
